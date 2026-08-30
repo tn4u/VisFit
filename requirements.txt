@@ -1,0 +1,55 @@
+# Core Deep Learning
+
+torch
+torchvision
+torchaudio
+
+# Fashion / Vision-Language
+
+transformers
+open_clip_torch
+fashion-clip
+
+# Vector Search
+
+faiss-cpu
+
+# Data Processing
+
+numpy
+pandas
+Pillow
+opencv-python
+tqdm
+
+# Machine Learning
+
+scikit-learn
+
+# Visualization
+
+matplotlib
+seaborn
+
+# Web Demo
+
+streamlit
+
+# Experiment Tracking
+
+wandb
+
+# Jupyter
+
+jupyter
+ipykernel
+notebook
+
+# Configuration
+
+PyYAML
+
+# Utilities
+
+requests
+python-dotenv

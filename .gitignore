@@ -1,10 +1,6 @@
-# Raw datasets
+# Raw datasets (ignore raw files except .gitkeep)
 /data/raw/*
 !/data/raw/.gitkeep
-
-# Processed images and generated outputs
-/data/processed/*
-!/data/processed/.gitkeep
 
 # NumPy arrays
 *.npy

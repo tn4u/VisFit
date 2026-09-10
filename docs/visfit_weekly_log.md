@@ -30,6 +30,65 @@
 - **Khanh (SV2)**: Chạy batch xử lý crop và resize ảnh trên toàn bộ 3 bộ dữ liệu lớn; 
 
 ## TUẦN 2: 31/08/2026 – 06/09/2026
+#### 👤 Sinh viên 1: Tuấn (SV1) - Phụ trách Data & Analytics
+### 1. Mục tiêu trọng tâm của tuần
+- Text preprocessing cho Branch A (DeepFashion-MultiModal) và Branch B (FashionIQ).
+- Làm sạch nhãn text: loại bỏ ký tự nhiễu, chuẩn hóa chính tả bằng Regex.
+- Chuẩn hóa định dạng Schema chung cho toàn bộ dự án.
+- Ánh xạ ground truth, thiết lập tập Query/Gallery và Train/Val/Test.
+
+### 2. Dataset Inspection (Text Metadata)
+
+| Hạng mục | DeepFashion-MultiModal | FashionIQ |
+|---|---|---|
+| **Nguồn dữ liệu gốc** | CSV tổng hợp | JSON lồng nhau (đã gộp thành CSV) |
+| **Total records** | 12,278 | 24,016 |
+| **Missing values (NaN)** | 0 | 0 |
+| **Cấu trúc trường dữ liệu** | `image_id`, `caption`, `product_id`, `category` | `candidate`, `target`, `caption`, `source_file` |
+| **Độ dài caption (trung bình)** | 234 ký tự | 65 ký tự |
+| **Định dạng bài toán** | Basic Retrieval | Composed Retrieval (Triplet) |
+
+### 3. Text Cleaning & Schema Normalization
+Áp dụng biểu thức chính quy (Regex) để làm sạch toàn bộ mô tả sản phẩm và câu lệnh chỉnh sửa, chuyển đổi về một Schema chuẩn `visfit_schema`.
+
+- **Pipeline xử lý**: Lowercase $\rightarrow$ Loại bỏ dấu câu $\rightarrow$ Xóa khoảng trắng thừa $\rightarrow$ Trích xuất Category.
+- **Cấu trúc Schema lõi**: `dataset_source`, `category`, `clean_caption`, `partition`.
+
+**Validation mẫu sau khi làm sạch:**
+
+| Dataset | Text gốc (Original) | Text đã làm sạch (Cleaned) |
+|---|---|---|
+| DeepFashion | "It is a grey shirt... and has pawn star on it!!" | "it is a grey shirt and has pawn star on it" |
+| FashionIQ | "has no sleeves, and is light pink & pink" | "has no sleeves and is light pink and pink" |
+
+### 4. Ground Truth Partitioning
+Xây dựng thuật toán phân chia tập đánh giá dựa trên đặc thù của từng bộ dữ liệu.
+
+**Đối với DeepFashion-MultiModal (Tạo Query/Gallery):**
+- Thuật toán đếm số lượng ảnh theo `product_id`. Chỉ các sản phẩm có $\ge 2$ ảnh mới đủ điều kiện làm Query.
+- Lấy mẫu ngẫu nhiên (seed=42) 1,000 ID sản phẩm hợp lệ, mỗi ID chọn 1 ảnh làm `query`, các ảnh còn lại đẩy vào `gallery`.
+
+**Đối với FashionIQ (Tạo Train/Val):**
+- Trích xuất nhãn phân tập trực tiếp từ tên file gốc (`source_file`).
+
+**Kết quả phân bổ (Data Partitioning Results):**
+
+| Tập dữ liệu | Partition | Số lượng (Records) | Tỷ lệ |
+|---|---|---|---|
+| **DeepFashion** | Gallery | 11,278 | 91.8% |
+| | Query | 1,000 | 8.2% |
+| **FashionIQ** | Train | 18,000 | 75.0% |
+| | Val | 6,016 | 25.0% |
+
+### 5. Output
+Các artifact được tạo từ quá trình xử lý và lưu trữ trên thư mục `data/processed/metadata/`:
+- `df_multimodal_query_gallery.csv`
+- `df_fashioniq_schema.csv`
+
+### 6. Kết luận Tuần 2 (SV1)
+- Đã hoàn thành 100% làm sạch text cho 36,294 mẫu từ cả 2 bộ dữ liệu.
+- Schema dự án đã được đồng nhất, đảm bảo tính tương thích cao cho các bước ghép nối.
+- Pipeline chia tập Query/Gallery tự động hoạt động chính xác. Dữ liệu đã sẵn sàng để sinh Prompt ở tuần tiếp theo.
 
 #### 👤 Sinh viên 2: Khanh (SV2) - Phụ trách Preprocessing & Vision Pipeline
 ### 1. Mục tiêu trọng tâm của tuần
@@ -170,3 +229,37 @@ Các artifact được tạo từ experiment trên Colab và được lưu trên
 - So sánh Original vs Cropped.
 - Retrieval evaluation.
 
+## TUẦN 3: 07/09/2026 – 13/09/2026
+
+#### 👤 Sinh viên 1: Tuấn (SV1) - Phụ trách Data & Analytics
+### 1. Mục tiêu trọng tâm của tuần
+- Xây dựng script sinh Prompt thuộc tính (Attribute Prompt) từ metadata.
+- Tách biệt định dạng đầu vào tối ưu cho 2 nhánh mô hình: Text-only (SBERT/TF-IDF) và Vision-Language (Fashion-CLIP).
+- Lấy mẫu đánh giá chất lượng prompt sinh ra.
+
+### 2. Prompt Engineering Design
+Do yêu cầu đặc thù của các kiến trúc mạng khác nhau, pipeline sinh text được thiết kế phân nhánh:
+
+- **Nhánh Text-only (`text_only_input`)**: Dữ liệu được giữ nguyên dưới dạng văn bản mô tả thuần túy (giữ lại `clean_caption`) để tránh làm loãng trọng số từ vựng của TF-IDF/SBERT.
+- **Nhánh Vision-Language (`fashion_clip_prompt`)**: Cấu trúc thành câu hoàn chỉnh mang ngữ cảnh hình ảnh để mô hình Fashion-CLIP dễ dàng ánh xạ sang không gian ảnh.
+  - *Template áp dụng*: `"a photo of a {category}, {clean_caption}"`.
+
+### 3. Prompt Quality Validation
+Thực hiện lấy mẫu ngẫu nhiên (random sampling) để đối chiếu giữa câu lệnh sinh tự động và nội dung thực tế của hình ảnh.
+
+| Ảnh ID (Sample) | Model Target | Output Prompt Sinh Tự Động | Đánh giá |
+|---|---|---|---|
+| `WOMEN-Blouses_Shirts...` | Text-only | "the shirt this person wears has long sleeves..." | Đạt |
+| `WOMEN-Blouses_Shirts...` | Fashion-CLIP | "a photo of a women blouses shirts, the shirt this person wears has long sleeves..." | Đạt |
+| `MEN-Tees_Tanks-id...` | Fashion-CLIP | "a photo of a men tees tanks, the person wears a tank tank top with color block patterns..." | Đạt |
+
+*Nhận xét đánh giá:* Các câu lệnh được sinh ra trôi chảy, đúng ngữ pháp tiếng Anh, thông tin category và caption được nối liền mạch. Đã đối chiếu chéo trực tiếp với file ảnh `.jpg` gốc và xác nhận thuộc tính miêu tả hoàn toàn khớp với hình ảnh thị giác.
+
+### 4. Output
+Các artifact được tạo từ quá trình sinh Prompt và lưu trữ trên thư mục metadata:
+- `data/processed/metadata/df_multimodal_prompts.csv`
+
+### 5. Kết luận Tuần 3 (SV1)
+- Hoàn thiện 100% việc chuẩn bị dữ liệu văn bản kép cho Nhánh A.
+- Phân tách thành công đầu vào chuyên biệt cho mô hình Text-only và Fashion-CLIP.
+- Không phát sinh lỗi logic trong quá trình sinh mẫu. Sẵn sàng tích hợp sang môi trường Colab để chạy Feature Extraction offline ở Tuần 4.

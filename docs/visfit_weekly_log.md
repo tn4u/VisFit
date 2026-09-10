@@ -263,3 +263,53 @@ Các artifact được tạo từ quá trình sinh Prompt và lưu trữ trên t
 - Hoàn thiện 100% việc chuẩn bị dữ liệu văn bản kép cho Nhánh A.
 - Phân tách thành công đầu vào chuyên biệt cho mô hình Text-only và Fashion-CLIP.
 - Không phát sinh lỗi logic trong quá trình sinh mẫu. Sẵn sàng tích hợp sang môi trường Colab để chạy Feature Extraction offline ở Tuần 4.
+
+## TUẦN 4: 14/09/2026 – 20/09/2026
+
+### PHẦN BÁO CÁO CỦA TUẤN (SV1) - Phụ trách Data & Analytics
+
+#### 1. Mục tiêu trọng tâm của tuần
+- Chuyển dịch môi trường xử lý văn bản lên Google Colab để tận dụng năng lực tính toán GPU.
+- Trích xuất đặc trưng (Feature Extraction) cho toàn bộ dữ liệu text của Nhánh A (DeepFashion) nhằm phục vụ bài toán Basic Retrieval.
+- Xây dựng các thang đo cơ sở (Text Baselines) đa dạng từ truyền thống đến hiện đại (TF-IDF, FastText, SBERT) để đối chiếu với mô hình đa phương thức (Fashion-CLIP).
+- Lưu trữ dữ liệu dưới định dạng vector numpy (`.npy`) offline để tối ưu tốc độ truy xuất.
+
+#### 2. Môi trường triển khai
+- **Nền tảng:** Google Colab.
+- **Phần cứng:** Tesla T4 GPU.
+- **Thư viện lõi:** `sentence-transformers`, `transformers` (Hugging Face), `gensim`, `scikit-learn`.
+
+#### 3. Quá trình Trích xuất Đặc trưng (Text Embedding Pipeline)
+Dựa trên 2 trường dữ liệu đầu vào đã phân tách từ Tuần 3 (`text_only_input` và `fashion_clip_prompt`), pipeline trích xuất được thiết kế cho 4 Text Encoder khác nhau:
+
+| Text Encoder | Nguồn cấp | Thiết lập / Model sử dụng | Loại dữ liệu | Mục đích |
+|---|---|---|---|---|
+| **TF-IDF** | `scikit-learn` | Trích xuất theo tần suất từ vựng (chạy trên CPU) | Rời rạc (Sparse) | Baseline truyền thống dựa trên từ vựng |
+| **FastText** | `gensim` | Train trực tiếp trên tập từ vựng thời trang dự án (Vector = 300) | Dày đặc (Dense) | Baseline truyền thống hiểu hình thái từ |
+| **SBERT** | Hugging Face | `all-MiniLM-L6-v2` (chạy batch_size=64 trên GPU) | Dày đặc (Dense) | Baseline ngữ nghĩa NLP |
+| **Fashion-CLIP** | Hugging Face | `patrickjohncyh/fashion-clip` (Nhánh Text) | Dày đặc (Dense) | Mô hình đích Đa phương thức |
+
+#### 4. Đánh giá chất lượng dữ liệu (Sanity Check)
+Sau khi trích xuất, tiến hành kiểm tra ngẫu nhiên (Sample Index = 0, ID: `MEN-Denim-id_00000089-28_1_front`) để xác minh tính toàn vẹn của không gian vector:
+
+*   **Về chiều dữ liệu (Dimension Shape):**
+    *   TF-IDF Vector: (101,)
+    *   FastText Vector: (300,)
+    *   SBERT Vector: (384,)
+    *   Fashion-CLIP Vector: (512,) - *Khớp hoàn toàn với không gian 512 chiều của Image Encoder (SV2 thực hiện).*
+*   **Về bản chất phân phối:**
+    *   **Vector thưa (Sparse):** TF-IDF hoạt động chuẩn xác, mẫu kiểm tra chỉ chứa 23/101 phần tử có giá trị khác 0 (đại diện cho các từ khóa xuất hiện trong câu).
+    *   **Vector đặc (Dense):** Cả FastText, SBERT và Fashion-CLIP đều trả về mảng số thực phân phối âm dương đan xen (vd CLIP: `[ 0.827, 1.543, -1.019...]`), chứng tỏ mô hình đã nhúng (embed) thành công ngữ nghĩa tiềm ẩn (latent features) của câu chữ.
+
+#### 5. Output (Artifacts)
+Toàn bộ kết quả đã được nén và lưu trữ tĩnh trên Google Drive tại thư mục `data/processed/embeddings/text_features/`, không ghi nhận vector lỗi (NaN/Empty):
+- `image_ids.npy` và `product_ids.npy` (Khóa đối chiếu gốc)
+- `tfidf_embeddings.npy`
+- `fasttext_embeddings.npy`
+- `sbert_embeddings.npy`
+- `fashionclip_text_embeddings.npy`
+
+#### 6. Kết luận Tuần 4 (SV1)
+- Đã hoàn tất 100% việc chuyển đổi không gian văn bản (Text) sang không gian số toán học (Vector) cho 4 kiến trúc Text Encoder.
+- Dữ liệu Offline `.npy` đã sẵn sàng, định tuyến hoàn hảo với đặc trưng hình ảnh.
+- Bàn giao thành công hệ thống dữ liệu cho SV2 để nạp vào FAISS Index và bắt đầu chạy thử nghiệm truy hồi Cosine Similarity trong tuần tới.

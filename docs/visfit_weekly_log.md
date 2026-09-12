@@ -264,6 +264,265 @@ Các artifact được tạo từ quá trình sinh Prompt và lưu trữ trên t
 - Phân tách thành công đầu vào chuyên biệt cho mô hình Text-only và Fashion-CLIP.
 - Không phát sinh lỗi logic trong quá trình sinh mẫu. Sẵn sàng tích hợp sang môi trường Colab để chạy Feature Extraction offline ở Tuần 4.
 
+#### 👤 Sinh viên 2: Khanh (SV2) - Phụ trách Vision Pipeline & Retrieval Evaluation
+
+### 1. Mục tiêu trọng tâm của tuần
+- Xây dựng các baseline ảnh để chuẩn bị so sánh với Fashion-CLIP trong bài toán Image Retrieval.
+- Chuẩn hóa và lưu trữ embedding dưới dạng `.npy` để phục vụ FAISS indexing.
+- Nghiên cứu official DeepFashion In-shop Clothes Retrieval partition.
+- Xây dựng mapping giữa DeepFashion-MultiModal và In-shop benchmark.
+- Thiết lập tập Query/Gallery và Ground Truth hợp lệ cho bước đánh giá retrieval.
+
+---
+
+### 2. Image Embedding với các Pretrained Image Encoder
+
+Sau khi hoàn thành Fashion-CLIP embedding ở tuần trước, trong tuần này tiến hành mở rộng pipeline trích xuất đặc trưng ảnh với 4 kiến trúc pretrained khác nhằm tạo các baseline để so sánh chất lượng retrieval.
+
+Các model được sử dụng:
+
+- ResNet50
+- EfficientNet-B0
+- VGG16
+- ViT-B/16
+
+Toàn bộ model sử dụng pretrained weights, chưa thực hiện fine-tuning.
+
+#### 2.1. Thiết lập thực nghiệm
+
+- Dataset: DeepFashion-Multi-Modal.
+- Subset sử dụng: 12,701 ảnh có Human Parsing Mask.
+- Input: Cropped clothing image được tạo từ preprocessing pipeline đã xây dựng ở tuần trước.
+- Device: CUDA GPU.
+- Batch inference.
+- Không cập nhật trọng số model.
+- Embedding được chuyển về `float32`.
+- Áp dụng L2 Normalization trước khi lưu.
+- Không ghi nhận lỗi trong quá trình inference.
+
+#### 2.2. Kết quả Image Embedding
+
+| Model | Samples | Embedding Dimension | Failed | Processing Time (s) | Images/sec |
+|---|---:|---:|---:|---:|---:|
+| ResNet50 | 12,701 | 2,048 | 0 | 185.65 | 68.41 |
+| EfficientNet-B0 | 12,701 | 1,280 | 0 | 150.94 | 84.15 |
+| VGG16 | 12,701 | 4,096 | 0 | 151.71 | 83.72 |
+| ViT-B/16 | 12,701 | 768 | 0 | 166.97 | 76.07 |
+
+Tất cả 4 model đều xử lý thành công toàn bộ 12,701 ảnh, không phát sinh failed sample.
+
+#### 2.3. So sánh với Fashion-CLIP
+
+Fashion-CLIP embedding đã được hoàn thành ở tuần trước và được giữ làm model chính của hệ thống.
+
+| Model | Embedding Dimension | Samples | Images/sec |
+|---|---:|---:|---:|
+| Fashion-CLIP | 512 | 12,701 | 24.53 |
+| ResNet50 | 2,048 | 12,701 | 68.41 |
+| EfficientNet-B0 | 1,280 | 12,701 | 84.15 |
+| VGG16 | 4,096 | 12,701 | 83.72 |
+| ViT-B/16 | 768 | 12,701 | 76.07 |
+
+EfficientNet-B0 đạt tốc độ trích xuất cao nhất trong nhóm benchmark, trong khi Fashion-CLIP có tốc độ thấp hơn do kiến trúc Vision-Language phức tạp hơn.
+
+Tuy nhiên, tốc độ inference **không phản ánh trực tiếp chất lượng retrieval**. Chưa thể kết luận model nào tốt nhất trước khi thực hiện FAISS retrieval và đánh giá bằng Recall@K/mAP.
+
+#### 2.4. Output
+
+Embedding của từng model được lưu độc lập để phục vụ bước xây dựng FAISS Index:
+
+- `data/processed/embeddings/resnet50/cropped_embeddings.npy`
+- `data/processed/embeddings/efficientnet_b0/cropped_embeddings.npy`
+- `data/processed/embeddings/vgg16/cropped_embeddings.npy`
+- `data/processed/embeddings/vit_b16/cropped_embeddings.npy`
+
+Mỗi thư mục đồng thời lưu:
+- `metadata.csv`
+- `failed_samples.csv`
+
+Các embedding đã được L2 normalize và sẵn sàng cho Cosine Similarity / FAISS Inner Product Search.
+
+---
+
+### 3. Xây dựng Ground Truth cho Image Retrieval
+
+Sau khi hoàn tất các Image Embedding baseline, tiến hành xây dựng Ground Truth để đảm bảo các model có thể được đánh giá trên cùng một tập Query/Gallery.
+
+Do DeepFashion-Multi-Modal subset hiện tại không cung cấp trực tiếp Query/Gallery chuẩn cho bài toán retrieval, tiến hành ánh xạ dữ liệu với official **DeepFashion In-shop Clothes Retrieval** benchmark.
+
+### 3.1. Official In-shop Partition
+
+Sử dụng file official:
+
+`list_eval_partition.txt`
+
+File chứa các trường:
+
+- `image_name`
+- `item_id`
+- `evaluation_status`
+
+Trong đó `evaluation_status` gồm:
+
+- `train`
+- `query`
+- `gallery`
+
+`item_id` được sử dụng làm Product Identity để xác định positive gallery image cho mỗi query.
+
+---
+
+### 3.2. DeepFashion-Multi-Modal ↔ In-shop Mapping
+
+Image ID trong DeepFashion-Multi-Modal có dạng:
+
+`MEN-Denim-id_00000089-01_7_additional`
+
+Từ đó trích xuất Product ID:
+
+`id_00000089`
+
+Product ID được đối chiếu với `item_id` trong official In-shop partition.
+
+Mapping chỉ được sử dụng để tạo Ground Truth khi ảnh có thể ánh xạ đủ điều kiện với official partition.
+
+Quá trình mapping tạo ra các artifact:
+
+- `mapping_result.csv`
+- `mapping_statistics.csv`
+
+---
+
+### 3.3. Tạo Query, Gallery và Ground Truth
+
+Sau quá trình mapping, tập dữ liệu ban đầu thu được:
+
+| Thành phần | Số lượng |
+|---|---:|
+| Query images ban đầu | 3,540 |
+| Gallery images | 2,944 |
+| Query-positive pairs | 4,697 |
+
+Positive Gallery của mỗi Query được xác định là các Gallery image có cùng `item_id`.
+
+Ground Truth được lưu dưới dạng cặp:
+
+`Query Image → Positive Gallery Image`
+
+---
+
+### 3.5. Phân tích Query không có Positive Gallery
+
+Trong quá trình validation phát hiện:
+
+**1,650 / 3,540 Query images không có Positive Gallery tương ứng trong subset hiện tại.**
+
+Tiến hành phân tích nguyên nhân theo `item_id`.
+
+Kết quả:
+
+| Nguyên nhân | Số Item |
+|---|---:|
+| Official In-shop partition không có Gallery | 0 |
+| Gallery tồn tại trong official benchmark nhưng không nằm trong DFM-MM parsing subset | 1,402 |
+
+Kết quả cho thấy toàn bộ lỗi không đến từ official benchmark.
+
+Các item này đều có Gallery image trong official In-shop dataset, tuy nhiên Gallery image tương ứng không xuất hiện trong subset 12,701 ảnh có parsing của DeepFashion-Multi-Modal đang được sử dụng.
+
+Do đó không thể đánh giá retrieval cho các Query này trên embedding hiện tại.
+
+---
+
+### 3.6. Lọc Evaluation Query
+
+Để đảm bảo metric retrieval hợp lệ, chỉ giữ lại Query có ít nhất một Positive Gallery trong tập Gallery hiện tại.
+
+Kết quả sau filtering:
+
+| Thành phần | Số lượng |
+|---|---:|
+| Query ban đầu | 3,540 |
+| Query không có Positive | 1,650 |
+| Valid Evaluation Query | 1,890 |
+| Gallery | 2,944 |
+| Ground Truth Positive Pairs | 4,697 |
+
+Tỷ lệ Query có thể sử dụng để đánh giá:
+
+**1,890 / 3,540 = 53.39%**
+
+1,650 Query bị loại được lưu riêng để phục vụ audit và kiểm tra lại dataset.
+
+Evaluation hiện tại vì vậy được xác định là:
+
+> Evaluation trên tập con DeepFashion-Multi-Modal có thể ánh xạ với official In-shop Clothes Retrieval partition.
+
+Không coi đây là kết quả trên toàn bộ official In-shop benchmark.
+
+---
+
+### 3.7. Ground Truth Output
+
+Các artifact được tạo:
+
+- `ground_truth/query.csv`
+- `ground_truth/gallery.csv`
+- `ground_truth/ground_truth.csv`
+- `ground_truth/query_without_positive.csv`
+- `mapping_result.csv`
+- `mapping_statistics.csv`
+
+Trong đó:
+
+- `query.csv`: chứa các Query hợp lệ để evaluation.
+- `gallery.csv`: chứa Gallery images.
+- `ground_truth.csv`: chứa các Query-Positive Gallery pair.
+- `query_without_positive.csv`: chứa các Query bị loại do không có positive trong current subset.
+
+---
+
+### 4. Kết luận Tuần 3 (SV2)
+
+Trong tuần đã hoàn thành hai nhóm công việc chính.
+
+**Image Feature Extraction:**
+- Hoàn thành embedding cho 4 pretrained Image Encoder:
+  - ResNet50
+  - EfficientNet-B0
+  - VGG16
+  - ViT-B/16
+- Embedding đã được L2 normalize và lưu dưới dạng `.npy`.
+- Cùng với Fashion-CLIP, hiện tại đã có 5 Image Encoder để thực hiện benchmark retrieval.
+
+**Ground Truth Construction:**
+- Xây dựng mapping giữa DeepFashion-Multi-Modal và official In-shop dataset.
+- Tạo Query/Gallery/Ground Truth cho subset hiện tại.
+- Sau filtering còn 1,890 valid Query, 2,944 Gallery images và 4,697 positive pairs.
+- Ground Truth đã sẵn sàng để sử dụng cho FAISS Retrieval Evaluation.
+
+---
+
+### 5. Kế hoạch cho tuần tiếp theo
+
+
+- Xây dựng FAISS Index từ Gallery embeddings.
+- Chạy retrieval cho toàn bộ 1,890 valid queries.
+- Đánh giá các metric:
+  - Recall@1
+  - Recall@5
+  - Recall@10
+  - Recall@20
+  - mAP
+- So sánh retrieval performance giữa:
+  - Fashion-CLIP
+  - ResNet50
+  - EfficientNet-B0
+  - VGG16
+  - ViT-B/16
+- Đánh giá thêm Original Image vs Cropped Image đối với Fashion-CLIP.
+- Phân tích qualitative retrieval bằng cách trực quan hóa Top-K kết quả đúng/sai.
+
 ## TUẦN 4: 14/09/2026 – 20/09/2026
 
 ### PHẦN BÁO CÁO CỦA TUẤN (SV1) - Phụ trách Data & Analytics

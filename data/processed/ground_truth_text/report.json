@@ -1,0 +1,23 @@
+{
+  "partition_images": 52712,
+  "captions_in_file": 12694,
+  "captions_removed_empty": 0,
+  "images_mapped": 12694,
+  "items_mapped": 6899,
+  "split_counts": {
+    "train": 6210,
+    "query": 3541,
+    "gallery": 2943
+  },
+  "queries_before_filter": 3541,
+  "queries_valid": 1893,
+  "queries_removed_no_positive": 1648,
+  "gallery_images": 2943,
+  "gallery_items": 2046,
+  "query_gallery_pairs": 4702,
+  "relevant_per_query_mean": 2.484,
+  "relevant_per_query_median": 2.0,
+  "relevant_per_query_max": 15,
+  "share_queries_with_single_positive": 0.4945,
+  "share_pairs_cross_view": 0.504
+}

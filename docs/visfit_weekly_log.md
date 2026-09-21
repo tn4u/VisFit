@@ -591,3 +591,276 @@ Trong tuần đã hoàn thành hai nhóm công việc chính.
 - Phân tích qualitative retrieval bằng cách trực quan hóa Top-K kết quả đúng/sai.
 
 ## TUẦN 4: 14/09/2026 – 20/09/2026
+
+### 👤 Sinh viên 1: Tuan (SV1)
+
+### 👤 Sinh viên 2: Khanh (SV2) – Vision Pipeline & Retrieval Evaluation
+
+## 1. Mục tiêu trọng tâm của tuần
+
+- Hoàn thiện đánh giá Branch A – Basic Fashion Image Retrieval.
+- Xây dựng FAISS retrieval benchmark để so sánh các Image Encoder trên cùng tập Query/Gallery/Ground Truth.
+- So sánh Fashion-CLIP trên ảnh Original và ảnh Cropped để đánh giá hiệu quả của bước Human Parsing Crop.
+- Chốt cấu hình triển khai cuối cho Branch A dựa trên kết quả thực nghiệm.
+- Bắt đầu thử nghiệm fine-tune Fashion-CLIP trên official DeepFashion In-shop Clothes Retrieval Benchmark bằng metric learning.
+- Chuẩn bị quy trình so sánh Pretrained Fashion-CLIP và Fine-tuned Fashion-CLIP trên cùng official evaluation protocol.
+
+---
+
+## 2. Hoàn thiện Retrieval Evaluation cho 5 Image Encoder
+
+### 2.1. Thiết lập đánh giá
+
+Sử dụng cùng một tập đánh giá đã xây dựng từ DeepFashion-MultiModal và official In-shop partition:
+
+- Valid Query: **1,890**
+- Gallery: **2,944**
+- Ground Truth positive pairs: **4,697**
+
+Tất cả model được đánh giá trên cùng Query/Gallery/Ground Truth nhằm đảm bảo tính công bằng.
+
+Các embedding đều được L2-normalize và truy hồi bằng:
+
+- FAISS `IndexFlatIP`
+- Inner Product trên vector đã L2-normalize tương đương Cosine Similarity
+
+Các metric sử dụng:
+
+- Recall@1
+- Recall@5
+- Recall@10
+- Recall@20
+- mAP
+- MRR
+
+Ngoài ra đo thêm:
+
+- Index Build Time
+- Search Time
+- Queries/sec
+
+### 2.2. Kết quả so sánh 5 Image Encoder
+
+| Model | Dimension | Recall@1 | Recall@5 | Recall@10 | Recall@20 | mAP | MRR |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Fashion-CLIP (Cropped) | 512 | **0.6164** | **0.7857** | **0.8370** | **0.8847** | **0.5837** | **0.6943** |
+| EfficientNet-B0 | 1280 | 0.4608 | 0.6386 | 0.7011 | 0.7630 | 0.4253 | 0.5429 |
+| ViT-B/16 | 768 | 0.4138 | 0.5937 | 0.6709 | 0.7333 | 0.3907 | 0.5000 |
+| ResNet50 | 2048 | 0.4090 | 0.5847 | 0.6598 | 0.7381 | 0.3824 | 0.4966 |
+| VGG16 | 4096 | 0.3434 | 0.5238 | 0.5947 | 0.6545 | 0.3195 | 0.4272 |
+
+### 2.3. Nhận xét
+
+- Fashion-CLIP đạt giá trị cao nhất trên toàn bộ các retrieval metric trong nhóm 5 encoder được khảo sát.
+- EfficientNet-B0 là baseline có kết quả tốt thứ hai trong experiment hiện tại.
+- ResNet50 và ViT-B/16 có kết quả khá gần nhau.
+- VGG16 có embedding dimension lớn nhất (4096) nhưng kết quả retrieval thấp nhất.
+
+---
+
+## 3. Ablation Study: Fashion-CLIP Original vs Cropped
+
+### 3.1. Mục tiêu
+
+Đánh giá xem preprocessing bằng Human Parsing Crop có thực sự cải thiện retrieval performance hay không.
+
+Hai variant sử dụng:
+
+- Fashion-CLIP Original Image
+- Fashion-CLIP Cropped Clothing Region
+
+Cả hai đều sử dụng:
+
+- cùng 1,890 Query
+- cùng 2,944 Gallery
+- cùng Ground Truth
+- embedding dimension 512
+- cùng FAISS IndexFlatIP
+- cùng metric evaluation
+
+### 3.2. Kết quả
+
+| Variant | Recall@1 | Recall@5 | Recall@10 | Recall@20 | mAP | MRR |
+|---|---:|---:|---:|---:|---:|---:|
+| **Fashion-CLIP Original** | **0.7365** | **0.8667** | **0.8942** | **0.9270** | **0.7037** | **0.7960** |
+| Fashion-CLIP Cropped | 0.6164 | 0.7857 | 0.8370 | 0.8847 | 0.5837 | 0.6943 |
+
+### 3.3. Chênh lệch Cropped so với Original
+
+| Metric | Delta |
+|---|---:|
+| Recall@1 | -0.1201 |
+| Recall@5 | -0.0810 |
+| Recall@10 | -0.0571 |
+| Recall@20 | -0.0423 |
+| mAP | -0.1199 |
+| MRR | -0.1017 |
+
+### 3.4. Nhận xét
+
+- Original Image vượt Cropped Image ở toàn bộ retrieval metric.
+- Recall@1 giảm khoảng **12.01 điểm phần trăm** khi sử dụng Cropped Image.
+- mAP giảm khoảng **11.99 điểm phần trăm**.
+- Human Parsing Crop được giữ lại như một **ablation experiment**, nhưng không được chọn làm preprocessing chính cho Branch A.
+
+---
+
+## 4. Chốt kiến trúc Branch A
+
+Dựa trên kết quả benchmark và ablation, cấu hình hiện tại của Branch A được chốt theo pipeline:
+
+```text
+Original Fashion Image
+        ↓
+Fashion-CLIP Image Encoder
+        ↓
+512D Embedding
+        ↓
+L2 Normalization
+        ↓
+FAISS IndexFlatIP
+        ↓
+Cosine Similarity Retrieval
+        ↓
+Top-K Similar Fashion Images
+```
+
+### Cấu hình lựa chọn
+
+- Backbone: `patrickjohncyh/fashion-clip`
+- Input: Original Image
+- Embedding Dimension: 512
+- Normalization: L2
+- Retrieval: FAISS `IndexFlatIP`
+- Similarity: Cosine Similarity
+- Main evaluation metrics: Recall@K, mAP, MRR
+
+Các model ResNet50, EfficientNet-B0, VGG16 và ViT-B/16 được giữ làm baseline comparison trong báo cáo.
+
+Human Parsing Crop được giữ làm preprocessing ablation, không sử dụng trong pipeline triển khai chính.
+
+---
+
+## 5. Bắt đầu Fine-tune Fashion-CLIP trên DeepFashion In-shop
+
+Sau khi hoàn thiện pretrained baseline của Branch A, bắt đầu thử nghiệm domain adaptation bằng official **DeepFashion In-shop Clothes Retrieval Benchmark**.
+
+### 5.1. Dataset
+
+Official In-shop benchmark gồm:
+
+- 52,712 ảnh
+- Evaluation partition chứa:
+  - `train`
+  - `query`
+  - `gallery`
+- Item ID giữa các partition không overlap theo official protocol.
+
+Quy tắc sử dụng:
+
+- `train`: chỉ dùng để fine-tune
+- `query` + `gallery`: chỉ dùng để evaluation
+- Không sử dụng query/gallery trong quá trình training
+
+### 5.2. Chiến lược Fine-tuning
+
+Mục tiêu là fine-tune Fashion-CLIP cho image-to-image retrieval bằng metric learning.
+
+Thiết kế ban đầu:
+
+- Loss: Supervised Contrastive Loss
+- PK Sampler:
+  - P = 8 identities
+  - K = 4 images / identity
+  - Batch size = 32
+- Embedding: 512D
+- L2 normalization
+- Optimizer: AdamW
+- Mixed precision trên CUDA
+- Fine-tune một phần vision backbone thay vì full fine-tune ngay từ đầu
+- Validation split từ official train partition theo `item_id` để tránh leakage
+- Query/Gallery official được giữ nguyên để đánh giá sau training
+
+### 5.3. Kết quả Pretrained vs Fine-tuned trên official In-shop
+
+Cả hai model được đánh giá trên cùng official Query/Gallery partition:
+
+- Query: **14,218**
+- Gallery: **12,612**
+- Embedding dimension: **512**
+- Retrieval backend: FAISS `IndexFlatIP`
+- Metrics: Recall@1/5/10/20, mAP, MRR
+
+| Model | Recall@1 | Recall@5 | Recall@10 | Recall@20 | mAP | MRR |
+|---|---:|---:|---:|---:|---:|---:|
+| Pretrained Fashion-CLIP | 0.6660 | 0.8505 | 0.8968 | 0.9297 | 0.4680 | 0.7482 |
+| **Fine-tuned Fashion-CLIP** | **0.8267** | **0.9400** | **0.9609** | **0.9744** | **0.6863** | **0.8768** |
+
+Kết quả cho thấy fine-tuning bằng metric learning cải thiện nhất quán trên toàn bộ các chỉ số retrieval so với pretrained baseline.
+
+---
+
+## 6. Kết quả chính của tuần
+
+### Hoàn thành
+
+- Xây dựng FAISS retrieval evaluation cho 5 Image Encoder.
+- Hoàn thành benchmark:
+  - Fashion-CLIP
+  - ResNet50
+  - EfficientNet-B0
+  - VGG16
+  - ViT-B/16
+- Tính Recall@1/5/10/20, mAP và MRR.
+- Fashion-CLIP cho kết quả cao nhất trong benchmark hiện tại.
+- Hoàn thành ablation Original vs Cropped.
+- Original Fashion-CLIP đạt:
+  - Recall@1 = 73.65%
+  - Recall@5 = 86.67%
+  - Recall@10 = 89.42%
+  - Recall@20 = 92.70%
+  - mAP = 70.37%
+  - MRR = 79.60%
+- Chốt Original Image + Fashion-CLIP + FAISS làm cấu hình chính cho Branch A pretrained.
+- Xây dựng notebook mới để thử fine-tune Fashion-CLIP trên official In-shop benchmark.
+- Hoàn thiện các bước chuẩn bị metric learning, PK Sampling và official train/query/gallery protocol.
+- Xử lý các lỗi ban đầu liên quan đến Fashion-CLIP output, DataLoader multiprocessing và AMP API trên Kaggle.
+
+### Hoàn thành Fine-tuning trên official In-shop
+
+Đã hoàn tất fine-tuning Fashion-CLIP trên official DeepFashion In-shop Clothes Retrieval Benchmark và đánh giá lại trên cùng official Query/Gallery partition.
+
+Kết quả:
+
+| Model | Training | Dimension | Queries | Gallery | Recall@1 | Recall@5 | Recall@10 | Recall@20 | mAP | MRR |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Fashion-CLIP | Pretrained | 512 | 14,218 | 12,612 | 0.6660 | 0.8505 | 0.8968 | 0.9297 | 0.4680 | 0.7482 |
+| Fashion-CLIP | Fine-tuned In-shop | 512 | 14,218 | 12,612 | **0.8267** | **0.9400** | **0.9609** | **0.9744** | **0.6863** | **0.8768** |
+
+### Mức cải thiện sau Fine-tuning
+
+| Metric | Pretrained | Fine-tuned | Absolute Delta |
+|---|---:|---:|---:|
+| Recall@1 | 0.6660 | 0.8267 | **+0.1607** |
+| Recall@5 | 0.8505 | 0.9400 | **+0.0895** |
+| Recall@10 | 0.8968 | 0.9609 | **+0.0641** |
+| Recall@20 | 0.9297 | 0.9744 | **+0.0447** |
+| mAP | 0.4680 | 0.6863 | **+0.2183** |
+| MRR | 0.7482 | 0.8768 | **+0.1286** |
+
+Nhận xét:
+
+- Fine-tuned Fashion-CLIP cải thiện rõ rệt trên toàn bộ retrieval metrics.
+- Recall@1 tăng khoảng **16.07 điểm phần trăm**.
+- Recall@5 tăng khoảng **8.95 điểm phần trăm**.
+- mAP tăng khoảng **21.83 điểm phần trăm**, cho thấy các positive gallery image không chỉ được tìm thấy nhiều hơn mà còn được xếp ở vị trí cao hơn trong ranking.
+- MRR tăng khoảng **12.86 điểm phần trăm**, cho thấy positive đầu tiên xuất hiện sớm hơn đáng kể sau fine-tuning.
+- Recall@20 đạt khoảng **97.44%**, cho thấy phần lớn query có ít nhất một positive image trong Top-20.
+
+---
+
+## 7. Kế hoạch tuần tiếp theo
+
+- Hoàn thiện visualization Top-K retrieval cho Pretrained và Fine-tuned Fashion-CLIP.
+- Chạy demo local.
+- Chuyển trọng tâm sang Branch B – Image + Text Composed Retrieval.

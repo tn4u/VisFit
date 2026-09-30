@@ -864,3 +864,41 @@ Nhận xét:
 - Hoàn thiện visualization Top-K retrieval cho Pretrained và Fine-tuned Fashion-CLIP.
 - Chạy demo local.
 - Chuyển trọng tâm sang Branch B – Image + Text Composed Retrieval.
+
+## TUẦN 6: 28/09/2026 – 04/10/2026
+### 👤 Sinh viên 1: Tuan (SV1)
+#### 1. Mục tiêu trọng tâm của tuần
+- Chuyển trọng tâm từ Nhánh A sang **Nhánh B – Composed Retrieval**, làm việc trên bộ dữ liệu **FashionIQ** (khác hoàn toàn DeepFashion-MultiModal đã dùng ở Nhánh A).
+- Xây dựng pipeline Offline Feature Extraction cho 2 thành phần đầu vào của Nhánh B: **Modification Text** và **Reference/Target Image**, sử dụng Fashion-CLIP.
+- Chuẩn bị output đúng định dạng (sequence-level cho Reference/Text, pooled cho Target) để sẵn sàng cấp dữ liệu cho khối Fusion Module (XAA – Cross-Attention Adapter) ở giai đoạn tiếp theo.
+
+#### 2. Chuẩn bị dữ liệu FashionIQ
+- Tải dataset FashionIQ (bản mirror Kaggle `binhhuunguyen/fashioniq`), đọc 6 file `cap.{dress,shirt,toptee}.{train,val}.json` (bỏ qua tập `test` do không có nhãn `target`).
+- Lọc bỏ file rác định dạng AppleDouble (`._*.jpg`) phát sinh trong thư mục ảnh do quá trình đóng gói dataset trên macOS.
+- Kiểm tra và xác nhận toàn bộ **24,016 triplet** `(reference_image_id, target_image_id, modification_text)` đều có đủ ảnh hợp lệ, không phát sinh mất mát do broken link.
+
+#### 3. Text Encoder Pipeline
+- Ghép 2 caption gốc của mỗi triplet (do 2 người gán nhãn độc lập mô tả cùng 1 khác biệt) thành 1 câu modifier duy nhất theo cú pháp `"{caption_1} and {caption_2}"`.
+- Kiểm tra thống kê độ dài câu (trung bình 11.7 từ, tối đa 29 từ) — xác nhận không có câu nào vượt giới hạn 77 token của CLIP.
+- Encode toàn bộ câu qua Fashion-CLIP Text Encoder (`patrickjohncyh/fashion-clip`), lấy **`last_hidden_state`** (giữ nguyên chuỗi token, không dùng `pooler_output`) để phục vụ Cross-Attention ở bước XAA sau này.
+- **Kết quả:** `hidden_states` shape `(24016, 77, 512)`, `attention_masks` shape `(24016, 77)`. Xử lý thành công 100% (24,016/24,016 câu).
+
+#### 4. Image Encoder Pipeline
+- Khử trùng lặp ID ảnh trước khi encode (do 1 ảnh Reference có thể dùng chung cho nhiều modifier khác nhau), rút gọn còn **16,787 ảnh Reference** và **23,742 ảnh Target** duy nhất.
+- Encode theo 2 nhánh khác nhau tùy vai trò:
+  - **Reference image** → `CLIPVisionModel`, giữ nguyên `last_hidden_state` dạng patch-level `(50, 768)` để phục vụ Cross-Attention.
+  - **Target image** → `CLIPModel.get_image_features()`, lấy vector đã pooled + projected về 512 chiều, L2-normalize, dùng làm nhãn Contrastive Loss và gallery cho FAISS (đồng nhất cách xử lý với Nhánh A).
+- **Kết quả:** `reference_hidden_states` shape `(16787, 50, 768)`, `target_embeds` shape `(23742, 512)`. Không ghi nhận ảnh lỗi/corrupt trong toàn bộ quá trình.
+
+#### 5. Đảm bảo tính toàn vẹn dữ liệu (Traceability)
+- Text lưu theo đúng thứ tự hàng CSV, kèm `category`, `split`, `reference_image_id`, `target_image_id`.
+- Ảnh lưu theo mapping ID → index (`reference_id2idx.json`, `target_id2idx.json`) do có trùng lặp giữa các dòng.
+- Sanity check xác nhận số lượng khớp tuyệt đối giữa mọi file `.npy` và metadata, không phát sinh lệch dữ liệu.
+#### 6. Vấn đề phát sinh và cách xử lý
+- Phiên bản `transformers` mới nhất trên Colab đổi hành vi trả về của `get_image_features()` (trả object `BaseModelOutputWithPooling` thay vì tensor trực tiếp), gây lỗi `AttributeError` khi tính L2-norm. Đã khắc phục bằng cách kiểm tra động thuộc tính `pooler_output`, đảm bảo pipeline chạy ổn định trên cả phiên bản cũ và mới.
+#### 7. Output (Artifacts)
+Lưu tại `data/processed/embeddings/text_features_taskb/` và `data/processed/embeddings/image_features_taskb/`:
+- `fashioniq_taskb_master.csv`
+- `fashionclip_text_hidden_states.npy`, `fashionclip_text_attention_masks.npy`
+- `reference_image_hidden_states.npy`, `reference_id2idx.json`
+- `target_image_embeds.npy`, `target_id2idx.json`

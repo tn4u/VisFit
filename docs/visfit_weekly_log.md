@@ -902,3 +902,400 @@ Lưu tại `data/processed/embeddings/text_features_taskb/` và `data/processed/
 - `fashionclip_text_hidden_states.npy`, `fashionclip_text_attention_masks.npy`
 - `reference_image_hidden_states.npy`, `reference_id2idx.json`
 - `target_image_embeds.npy`, `target_id2idx.json`
+
+## TUẦN 6: 28/09/2026 – 04/10/2026
+
+### 👤 Sinh viên 2: Khanh (SV2) – Vision Pipeline & Local Retrieval Demo
+
+### 1. Mục tiêu trọng tâm của tuần
+
+- Tiếp tục tối ưu Branch A – Basic Fashion Image Retrieval sau khi đã hoàn thành fine-tuning Fashion-CLIP trên official DeepFashion In-shop.
+- Thử nghiệm lại chiến lược crop vùng trang phục bằng **official Bounding Box** của In-shop thay cho Human Parsing Crop trước đó.
+- Fine-tune riêng Fashion-CLIP trên ảnh đã crop bằng Bounding Box và so sánh trực tiếp với model fine-tuned trên ảnh Original.
+- Chốt variant cuối cùng cho Branch A dựa trên kết quả thực nghiệm.
+- Chuẩn bị pipeline chạy demo local gồm:
+  - Fine-tuned Fashion-CLIP.
+  - FAISS Index.
+  - Gallery Metadata.
+  - Module encode query image.
+  - Module retrieval Top-K.
+  - Giao diện Streamlit.
+
+---
+
+### 2. Thử nghiệm Fine-tune với Official Bounding Box
+
+#### 2.1. Mục tiêu
+
+Ở experiment trước, Human Parsing Crop cho kết quả thấp hơn Original Image.
+
+Do đó trong tuần này tiếp tục kiểm tra một preprocessing variant khác là:
+
+- **Original Image**
+- **Official In-shop Bounding Box Crop**
+
+Khác với Human Parsing Crop, Bounding Box được lấy trực tiếp từ annotation chính thức của DeepFashion In-shop.
+
+Mục tiêu là đánh giá xem việc tập trung model vào vùng clothing item có giúp cải thiện image retrieval hay không.
+
+---
+
+### 2.2. Dataset và annotation
+
+Sử dụng official DeepFashion In-shop Clothes Retrieval Benchmark.
+
+Các thành phần chính:
+
+- Tổng số ảnh: **52,712**
+- Official partition:
+  - Train: **25,882**
+  - Query: **14,218**
+  - Gallery: **12,612**
+
+File sử dụng:
+
+```text
+Eval/list_eval_partition.txt
+```
+
+và:
+
+```text
+list_bbox_inshop.txt
+```
+
+Bounding Box cung cấp tọa độ:
+
+```text
+x1, y1, x2, y2
+```
+
+cho từng ảnh.
+
+Pipeline crop:
+
+```text
+Original Image
+      ↓
+Official Bounding Box
+      ↓
+Padding 5%
+      ↓
+BBox Cropped Image
+      ↓
+Fashion-CLIP Processor
+```
+
+Padding sử dụng:
+
+```text
+BBOX_PADDING_RATIO = 0.05
+```
+
+---
+
+### 2.3. Kiểm tra dữ liệu Bounding Box
+
+Trước khi training, thực hiện validation:
+
+- Parse official partition.
+- Parse Bounding Box annotation.
+- Kiểm tra image name giữa partition và bbox.
+- Kiểm tra invalid bbox.
+- Kiểm tra duplicate.
+- Kiểm tra ảnh bị thiếu bbox.
+- Visualize:
+  - Original Image.
+  - BBox Overlay.
+  - BBox Cropped Image.
+
+Các ảnh crop được xử lý on-the-fly trong Dataset class, không lưu toàn bộ ảnh crop ra disk.
+
+---
+
+### 3. Fine-tuning Fashion-CLIP với BBox Crop
+
+Để đảm bảo phép so sánh công bằng với model Original, cấu hình fine-tuning được giữ gần như giống experiment trước.
+
+### 3.1. Model
+
+Model:
+
+```text
+patrickjohncyh/fashion-clip
+```
+
+Embedding:
+
+```text
+512 dimensions
+```
+
+Không sử dụng text encoder.
+
+Không sử dụng classification head.
+
+---
+
+### 3.2. Training configuration
+
+- Loss: **Supervised Contrastive Loss**
+- Temperature: `0.07`
+- PK Sampler:
+  - P = 8 identities
+  - K = 4 images / identity
+  - Batch size = 32
+- Optimizer: AdamW
+- Backbone LR: `1e-5`
+- Projection LR: `1e-4`
+- Weight decay: `1e-4`
+- Epochs: 8
+- Mixed Precision: PyTorch AMP
+- Gradient clipping: 1.0
+- Validation split:
+  - tách từ official train partition
+  - split theo `item_id`
+  - không split image-level
+- Partial fine-tuning:
+  - freeze phần lớn backbone
+  - unfreeze các vision block cuối
+  - train `visual_projection`
+
+Query và Gallery official không được sử dụng trong training.
+
+---
+
+### 4. Kết quả Original vs BBox Fine-tuned
+
+Cả hai variant được đánh giá trên cùng official protocol:
+
+- Query: **14,218**
+- Gallery: **12,612**
+- Embedding Dimension: **512**
+- FAISS: `IndexFlatIP`
+- Embedding: L2-normalized
+- Similarity: Cosine Similarity
+- Metrics:
+  - Recall@1
+  - Recall@5
+  - Recall@10
+  - Recall@20
+  - mAP
+  - MRR
+
+### 4.1. Kết quả
+
+| Variant | Recall@1 | Recall@5 | Recall@10 | Recall@20 | mAP | MRR |
+|---|---:|---:|---:|---:|---:|---:|
+| **Fine-tuned Fashion-CLIP Original** | **0.8267** | **0.9400** | **0.9609** | **0.9744** | **0.6863** | **0.8768** |
+| Fine-tuned Fashion-CLIP BBox | 0.6724 | 0.8313 | 0.8786 | 0.9147 | 0.5089 | 0.7444 |
+
+---
+
+### 4.2. Delta BBox so với Original
+
+| Metric | Original | BBox | Absolute Delta | Relative Change |
+|---|---:|---:|---:|---:|
+| Recall@1 | 0.8267 | 0.6724 | -0.1543 | -18.67% |
+| Recall@5 | 0.9400 | 0.8313 | -0.1087 | -11.56% |
+| Recall@10 | 0.9609 | 0.8786 | -0.0823 | -8.56% |
+| Recall@20 | 0.9744 | 0.9147 | -0.0597 | -6.13% |
+| mAP | 0.6863 | 0.5089 | -0.1774 | -25.84% |
+| MRR | 0.8768 | 0.7444 | -0.1324 | -15.10% |
+
+---
+
+### 4.3. Nhận xét
+
+- BBox Crop thấp hơn Original ở toàn bộ retrieval metrics.
+- Recall@1 giảm khoảng **15.43 điểm phần trăm**.
+- mAP giảm khoảng **17.74 điểm phần trăm**.
+- Relative mAP giảm khoảng **25.84%**.
+- Kết quả cho thấy việc loại bỏ phần lớn context ngoài vùng Bounding Box làm giảm chất lượng retrieval đối với Fashion-CLIP.
+- Fine-tuned Fashion-CLIP vẫn tận dụng hiệu quả thông tin toàn cục của ảnh như:
+  - pose
+  - silhouette
+  - body context
+  - hình dáng tổng thể
+  - tương quan giữa clothing item và người mặc
+
+Do đó BBox Crop không được chọn làm preprocessing chính.
+
+---
+
+## 5. Chốt model cuối cho Branch A
+
+Sau các experiment:
+
+```text
+Human Parsing Crop
+BBox Crop
+Original Image
+Pretrained Fashion-CLIP
+Fine-tuned Fashion-CLIP
+```
+
+variant cuối cùng được lựa chọn là:
+
+```text
+Original Image
+      ↓
+Fine-tuned Fashion-CLIP
+      ↓
+512D Embedding
+      ↓
+L2 Normalization
+      ↓
+FAISS IndexFlatIP
+      ↓
+Top-K Similar Fashion Images
+```
+
+Kết quả chính thức:
+
+```text
+Recall@1  = 0.8267
+Recall@5  = 0.9400
+Recall@10 = 0.9609
+Recall@20 = 0.9744
+mAP       = 0.6863
+MRR       = 0.8768
+```
+
+Đây được chọn làm model chính cho Branch A.
+
+---
+
+## 6. Chuẩn bị demo local
+
+Sau khi chốt model, bắt đầu triển khai pipeline chạy local.
+
+Runtime pipeline:
+
+```text
+User Upload Image
+        ↓
+Fine-tuned Fashion-CLIP
+        ↓
+512D Query Embedding
+        ↓
+L2 Normalize
+        ↓
+FAISS Index
+        ↓
+Top-K Indices
+        ↓
+Gallery Metadata
+        ↓
+Local Image Path
+        ↓
+Display Results
+```
+
+---
+
+### 6.1. Runtime artifacts
+
+Các artifact chính:
+
+```text
+models/branch_a/
+└── best_fashionclip_inshop.pt
+```
+
+```text
+data/processed/branch_a/
+├── finetuned_gallery_embeddings.npy
+└── gallery_metadata.csv
+```
+
+```text
+indexes/branch_a/
+└── gallery.index
+```
+
+---
+
+### 6.2. Gallery Metadata
+
+Xây dựng lại metadata trên local để tránh phụ thuộc path của Kaggle.
+
+Schema:
+
+```text
+image_name
+item_id
+image_path
+```
+
+Ví dụ:
+
+```text
+img/WOMEN/Dresses/id_xxx/01_1_front.jpg
+id_xxx
+D:\datasets\inshop\img\WOMEN\...
+```
+
+Metadata được kiểm tra:
+
+- 12,612 rows.
+- 100% local image path tồn tại.
+- thứ tự `image_name` khớp official Gallery.
+- thứ tự `item_id` khớp official Gallery.
+- số row metadata khớp số row embedding.
+- random self-retrieval bằng FAISS trả đúng chính embedding tương ứng ở Top-1.
+
+---
+
+### 6.3. FAISS Index local
+
+Tạo index từ:
+
+```text
+finetuned_gallery_embeddings.npy
+```
+
+Kết quả:
+
+```text
+Embeddings shape: (12612, 512)
+Norm mean: 1.0
+FAISS ntotal: 12612
+```
+
+Index:
+
+```text
+FAISS IndexFlatIP
+```
+
+Self-retrieval test:
+
+```text
+Query row 100
+Top-5 indices:
+[100, 4781, 99, 4785, 4780]
+```
+
+Row 100 được trả về ở Top-1, xác nhận index hoạt động đúng.
+
+
+---
+
+## 7. Kết quả chính của tuần
+
+- Hoàn thành experiment Fine-tuned Fashion-CLIP với official BBox Crop.
+- Xây dựng pipeline crop bằng official bounding box + 5% padding.
+- Đánh giá BBox model trên official In-shop benchmark.
+- BBox thấp hơn Original ở toàn bộ retrieval metric.
+- Recall@1:
+  - Original: 0.8267
+  - BBox: 0.6724
+- mAP:
+  - Original: 0.6863
+  - BBox: 0.5089
+- Chốt Fine-tuned Fashion-CLIP Original làm model cuối của Branch A.
+- Chuẩn bị thành công Gallery Metadata cho local.
+- Kiểm tra metadata, path, embedding alignment và self-retrieval thành công.
+- Triển khai Streamlit demo.
+

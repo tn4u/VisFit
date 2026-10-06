@@ -8,7 +8,7 @@ from src.models.branch_a_model import (
     BranchAModel
 )
 
-from src.retrivals.branch_a_retrieval import (
+from src.retrievals.branch_a_retrieval import (
     BranchARetriever
 )
 

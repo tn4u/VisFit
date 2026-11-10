@@ -49,3 +49,24 @@ Hai XAA/DVR cũ được thay bằng bản development mới; hai encoder week5 
 Output/debug/widget/user metadata đã xóa; code/config khoa học giữ nguyên, riêng adapter full bỏ cell live probe/driver lỗi trùng và thêm opt-in cho driver thành công. Tổng hợp ngắn ở README thay cho output dài. [Nguồn và SHA](taskb_sources.json) lưu dấu vết trước dọn.
 
 Lần rà soát chỉ kiểm tra JSON/nbformat, cú pháp IPython/Python, định nghĩa trước sử dụng ở cell top-level, tính tự chứa, liên kết/tên file, secret, kích thước và diff; tính lại thống kê adapter từ artifact. Không chạy training, benchmark hay nạp lại checkpoint GPU; chưa xác minh lại toàn bộ binary/shard trong lần này. Saved output và JSON completion là bằng chứng lịch sử, không thay kiểm tra runtime bắt buộc khi chạy lại.
+
+## Dependency audit: clone repo có đủ để chạy từ đầu không?
+
+**Đủ bộ code notebook cho hai quy trình báo cáo khi có các artifact đã khóa; chưa đủ để tái hiện độc lập chỉ bằng GitHub.** [Inventory dependency](taskb_artifacts.json) liệt kê path, SHA mong đợi và thư viện lấy trực tiếp từ code; đây không phải xác nhận mọi tài khoản đều truy cập được dữ liệu.
+
+| Thành phần ngoài Git | Nơi lấy / cách tạo và giới hạn |
+|---|---|
+| FashionIQ ảnh + `cap.*.{train,val}.json`, `split.*.val.json` | Kaggle `binhhuunguyen/fashioniq`, preparation tự tải nếu thiếu. Annotation/ảnh phải khớp snapshot và audit; không thay bằng dataset khác chỉ cùng tên. |
+| **`FashionIQ_Task_B_Experiment_Split.csv`** | `embeddings/text_features_taskb/` dưới root Drive chung; SHA `9e9680556bd26348f29f5f529e765dfebb78d1c1d85f404c95bb6db6bac8da13`. Đây là đầu vào bắt buộc của `development_views()`, không chỉ file đối chiếu. Kaggle không cung cấp nhãn split nội bộ này; cần xin đúng bản từ chủ artifact. Không tự tạo split khác rồi sửa SHA. |
+| Preparation package | `taskb_prepare` tạo protocol/config/audit, development/official manifests, feature views, mapping/index và shards. XAA/DVR/adapter kiểm SHA cụ thể của package. Tạo lại với runtime/preprocessing khác có thể đổi contract/SHA và bị từ chối; một lượt mới không mặc nhiên tương đương snapshot báo cáo. |
+| XAA baseline development | `taskb_xaa_dev` tạo ba seed trong campaign gốc. `taskb_dvr_dev` import kết quả này chỉ đọc; `taskb_final` cần đủ baseline và DVR curves trước khi khóa E*=8. |
+| Legacy Conventional-only seed42 | `tme_development/FashionIQ/tme_dev_v1_seed42`: `conventional/{config.json,best.pt,last.pt,best.json,last.json,metric_history.json,epoch_*_per_query.csv}` và metadata/manifests của run. `taskb_encoder_dev` là nguồn lịch sử, không bảo đảm chạy mới sẽ sinh lại đúng byte checkpoint/JSON đã khóa. |
+| Legacy adapter seed42 | `retrieval_only_dev_v1_base42_adapter42_checked_v2_storagefix`: training config, best/last checkpoint + markers, history, epoch/query/Top-K/verification outputs. **`taskb_adapter_full` luôn import seed42**, kể cả preflight; không có nhánh fallback train lại seed42 khi thiếu snapshot. Cần xin bộ artifact được khóa từ chủ sở hữu. |
+| Trial metadata/cache của adapter dev lịch sử | `tme_adapter_trial/FashionIQ/adapter_trial_v1_seed42`; `taskb_adapter_dev` kiểm `TRIAL_ARTIFACT_LOCKS`, gồm trial request/config/provenance/audit, baseline/retrieval results và index cache. Đây là dependency thật dù không warm-start trọng số trial. Nguồn trial không được đưa thêm vào repo chỉ để giả rằng có thể dựng lại đúng snapshot. |
+| Final checkpoint, lock, summary/query/Top-K | Các campaign Drive ở trên; chạy các phase đúng thứ tự để tạo trong môi trường tương thích. Không dùng số trong README thay artifact. Encoder/feature cache lớn không đưa vào Git. |
+
+Thư viện cài từ các cell bootstrap/stdlib và môi trường Colab; không cần script Python nội bộ bị bỏ sót hay import `.ipynb` khác. Một số runtime được khóa đúng torch/CUDA và SDK; không tự nâng cấp để vượt kiểm tra. `requirements.txt` ở root phục vụ project chung, không thay bootstrap riêng của thí nghiệm.
+
+Artifact Drive là dữ liệu của tài khoản chủ sở hữu, không được coi là công khai chỉ vì có URL. Liên hệ chủ artifact để cấp quyền hoặc cung cấp bản được phép chia sẻ; lần audit này không mở quyền, không đưa CSV annotation/manifest, dataset, credential hoặc checkpoint lên Git. Repo chứa config, schema/hàm sinh manifest và expected SHA; bản payload nhỏ nằm trên Drive vẫn cần quyền truy cập và điều kiện phân phối phù hợp.
+
+Rà soát Git sau sắp xếp: các notebook Task B chỉ còn trên branch encoder cũ là hai week5 đã thay bằng preparation; không có notebook tuần44/45 mới bị bỏ quên ở worktree khác. Các notebook Task A khác trên branch lịch sử không nhập vào đây. File benchmark chưa tracking vẫn giữ nguyên; không phải thiếu commit của bộ báo cáo. Các bản adapter development chưa chạy trong Downloads không thay nguồn storagefix đã xác minh. Không có notebook SOTA riêng cần nhập trong các nguồn được kiểm kê; đối chiếu công bố vẫn thuộc báo cáo, không phải benchmark đã tái lập.

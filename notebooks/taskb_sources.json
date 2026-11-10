@@ -1,0 +1,91 @@
+{
+  "sources": [
+    {
+      "notebook": "taskb_prepare.ipynb",
+      "source": "[ĐATN][TaskB]FashionIQ_Benchmark_Preparation.ipynb",
+      "source_sha256": "05096767e23561c7a1f87c4fef1c00bdff36bfd3324bf18c50de9a75ea7d0ab7",
+      "source_code_sha256": "d930e8908e42cd3d3e55b3ab0c1b51aef5b761d4c5d9a3e05d64f7e820f04ac6",
+      "purpose": "Protocol, annotation audit and frozen feature package",
+      "cleanup": "Cleared outputs/execution and user/widget metadata; shortened introduction. All code/config/provenance strings unchanged."
+    },
+    {
+      "notebook": "taskb_xaa_dev.ipynb",
+      "source": "[ĐATN][TaskB]01_Development_XAA.ipynb",
+      "source_sha256": "ebd1c0674b91230f9f82cc84d0217502a7b379d0e4092690b6efffd407f8c136",
+      "source_code_sha256": "0fc3b7e0e20d0b5cd4f2334bab763dc895f9c03802c22b31b04d405bb4b80e6f",
+      "purpose": "Three-seed XAA development; original baseline campaign",
+      "cleanup": "Cleared outputs/execution and user/widget metadata; shortened introduction. All code/config/provenance strings unchanged."
+    },
+    {
+      "notebook": "taskb_dvr_dev.ipynb",
+      "source": "[ĐATN][TaskB]02_Development_DVR_optimized.ipynb",
+      "source_sha256": "f837a82d5f8ab8ccae33928ca8a38812b93e76d246c814164d7e5b22832b6d0d",
+      "source_code_sha256": "000351353b14b0f29d4f3c5d3c3c0bc4f54837ffdccd867a2052a652401274af",
+      "purpose": "Three-seed MR/SR/Full DVR development and baseline semantic import",
+      "cleanup": "Cleared outputs/execution and user/widget metadata; shortened introduction. All code/config/provenance strings unchanged."
+    },
+    {
+      "notebook": "taskb_final.ipynb",
+      "source": "[ĐATN][TaskB]03_Final_Training_OfficialVal_optimized.ipynb",
+      "source_sha256": "728b04d9a810cbb3f450d9d5fcbae0d5965186f97880e3bc5fb3fbdde81aac01",
+      "source_code_sha256": "ac546d1735243fafeddf52846bdfa98d326eff57cc59add8761b8a287e46dfc8",
+      "purpose": "Common E*=8, fresh heads and twelve official-val runs",
+      "cleanup": "Cleared outputs/execution and user/widget metadata; shortened introduction. All code/config/provenance strings unchanged."
+    },
+    {
+      "notebook": "taskb_adapter_full.ipynb",
+      "source": "[ĐATN][TaskB]TME_Adapter_Full_Experiment.ipynb",
+      "source_sha256": "249b1b4638530df416961958996946d204c460951d0f14faad92bac026a124f4",
+      "source_code_sha256": "7e420ba1713be92517eebf0241deee1ca78a76b583bb3de728ccbfc213a32cbf",
+      "purpose": "Three full-pipeline seeds; encoder/adapters, common lock and paired official-val",
+      "cleanup": "Cleared outputs/execution and user/widget metadata; shortened introduction. Adapter full: removed redundant live probe/interrupted duplicate driver and guarded successful driver with RUN_FULL_PIPELINE=False; scientific runtime/config/checkpoint paths unchanged."
+    },
+    {
+      "notebook": "taskb_encoder_dev.ipynb",
+      "source": "[ĐATN][TaskB]TME_Development.ipynb",
+      "source_sha256": "6b0ad94e67290088bcf0a618b1295aa0b561237fd0b3edd292763d61c3dbbc4f",
+      "source_code_sha256": "9b62678bf4d55dabee40f7777d38957a7953e6cc3786277d7fa4a467b32f528d",
+      "purpose": "Historical source of the reused conventional seed42 checkpoint",
+      "cleanup": "Cleared outputs/execution and user/widget metadata; shortened introduction. All code/config/provenance strings unchanged."
+    },
+    {
+      "notebook": "taskb_adapter_dev.ipynb",
+      "source": "adapter_verified.ipynb",
+      "source_sha256": "4975777fb9653d352bc45d5f5f502dffc74bd8a8549674c2eca71fc3d12391fb",
+      "source_code_sha256": "5f01118dd38c3c9a98048994c114b0d1e5efd9d222c3e541ba936177f0df23b6",
+      "purpose": "Verified storagefix source of the reused adapter seed42 checkpoint",
+      "cleanup": "Cleared outputs/execution and user/widget metadata; shortened introduction. All code/config/provenance strings unchanged."
+    },
+    {
+      "notebook": "taskb_adapter_dev.ipynb",
+      "source_url": "https://colab.research.google.com/drive/15ElRQ4l_4cNWt0pppiBxibu5QvVL4I5-",
+      "note": "Only verified checked_v2_storagefix source has the legacy CODE_SHA256=63c5666... accepted by full experiment. Local checked/unexecuted variants excluded."
+    }
+  ],
+  "reports": [
+    "week 44/44_8_523H0190_Baocaodoan.pdf",
+    "week 45/45_7_523H0190_Baocaodoan.pdf",
+    "week 45/Tuần 45 Adapter.docx"
+  ],
+  "verification": "Reports and saved outputs match Drive aggregate/lock/completion artifacts. No retraining or checkpoint binary revalidation in this curation. Published-method numbers remain report citations, not locally reproduced experiments.",
+  "excluded": [
+    "Old XAA/DVR and week5 feature encoders superseded by audited preparation and new dev/final workflow; originals available in Git history.",
+    "Untracked FashionIQ_OfficialVal_Benchmark left untouched and unstaged: old-checkpoint benchmark without saved results, not source of reported final-training metrics.",
+    "Pilot/trial/unexecuted local adapter development copies; no separate SOTA notebook located in supplied sources."
+  ],
+  "checks": {
+    "notebook_count": 7,
+    "nbformat_and_IPython_syntax": "passed",
+    "code_cell_order": "Original source order preserved; redundant full-experiment live probe and interrupted driver removed. No fresh GPU rerun.",
+    "scientific_code": "All code unchanged except explicit opt-in wrapper for successful adapter full orchestration; artifact/provenance paths and hashes retained.",
+    "saved_results": "week44 Drive execution_status.complete confirms12 runs; benchmark_summary matches all4 saved notebook rows/report rounded values. Adapter Drive summary complete6 rows and sample std recomputed; lock common eligibleepochs1..10 selects9.",
+    "lint": "No undefined names except two pyflakes closure/delete false positives in historical encoder_dev commit(): model/opt are assigned in enclosing run_variant before callback and deleted only in finally. Historical saved run completed.",
+    "secret": "Known credential/key patterns and literal sensitive assignments scanned; no credential values detected. Outputs/user/widget metadata removed.",
+    "not_run": "No training, dataset download, GPU forward, complete cache/checkpoint-binary revalidation, or published-model reproduction during curation."
+  },
+  "report_sha256": {
+    "week 45/Tuần 45 Adapter.docx": "9e817d8808a70a1ab8da0bedf7a71d158f72dad62d9760bb8d7ecbbebb010861",
+    "week 45/45_7_523H0190_Baocaodoan.pdf": "8007dcf2fb34e8e0699eda96e4dfd44481b8526f481d6963c3a658e9f84013e5",
+    "week 44/44_8_523H0190_Baocaodoan.pdf": "916b7677d47fdf26282263cb6bd0dbdf588c7c71137277a8538379304714cd31"
+  }
+}

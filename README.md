@@ -1012,3 +1012,7 @@ Các dataset bên thứ ba phải được sử dụng theo license/terms của 
 Đặc biệt, **DeepFashion-MultiModal chỉ được sử dụng cho mục đích nghiên cứu phi thương mại** theo phạm vi của đồ án. Không commit hoặc phân phối dataset lên repository GitHub.
 
 
+
+## Task B — notebook theo báo cáo tuần44/45
+
+Xem [hướng dẫn Task B](notebooks/README_taskb.md) để biết thứ tự chạy, nguồn artifact, kết quả đối chiếu và giới hạn kiểm chứng. Bộ này tách development/internal-val khỏi final official-val; nhánh residual adapter là biến thể lấy cảm hứng TME.

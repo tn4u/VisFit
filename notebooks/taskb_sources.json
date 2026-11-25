@@ -60,6 +60,30 @@
       "notebook": "taskb_adapter_dev.ipynb",
       "source_url": "https://colab.research.google.com/drive/15ElRQ4l_4cNWt0pppiBxibu5QvVL4I5-",
       "note": "Only verified checked_v2_storagefix source has the legacy CODE_SHA256=63c5666... accepted by full experiment. Local checked/unexecuted variants excluded."
+    },
+    {
+      "notebook": "taskb_adapter_trial.ipynb",
+      "source": "VisFit_TaskB_TongKet/Mo_hinh/Adapter/Trial.ipynb",
+      "source_sha256": "7485455bb4fb9d8566dac6763cb13e3ced4a7c57a11c385af604394d2040a3c9",
+      "source_code_cells_json_sha256": "7749230360dea69f032977c8bb908a7e56c4b50df45e0cc8efe983aab1420306",
+      "purpose": "Seed42 retrieval/alignment trials and the trial cache/metadata used by adapter development.",
+      "cleanup": "Cleared outputs, execution counts and export metadata; preserved cell source and order."
+    },
+    {
+      "notebook": "taskb_adapter_mr.ipynb",
+      "source": "VisFit_TaskB_TongKet/Mo_hinh/Adapter_MR/Pilot_va_Final.ipynb",
+      "source_sha256": "7e701231bdb62d16d3fba2707ad2aad9ebda68cc8b33337ab8e29af2a66a5496",
+      "source_code_cells_json_sha256": "462b9f2983a9f9b2f97cd9d556399650229425241ec68988c57baf2083daac50",
+      "purpose": "Pilot A/B/C/D, common epoch lock, fresh MR training and paired official-val.",
+      "cleanup": "Cleared outputs, execution counts and export metadata; preserved cell source and order."
+    },
+    {
+      "notebook": "taskb_demo.ipynb",
+      "source": "VisFit_TaskB_TongKet/Mo_hinh/_Dung_chung/Nguon/taskb_demo.ipynb",
+      "source_sha256": "630d7b932fede24c6203096414dad7c5f50414c1a9ecf753d47f9cf029324a5f",
+      "source_code_cells_json_sha256": "8630c204833d2df9c26025dd8a84bdbbf9992bb79a81e7378b1ef2c1bed4bd71",
+      "purpose": "FAISS official-val browser and image + modifier inference with final seed42 artifacts.",
+      "cleanup": "Cleared outputs, execution counts and export metadata; preserved cell source and order."
     }
   ],
   "reports": [
@@ -71,10 +95,10 @@
   "excluded": [
     "Old XAA/DVR and week5 feature encoders superseded by audited preparation and new dev/final workflow; originals available in Git history.",
     "Untracked FashionIQ_OfficialVal_Benchmark left untouched and unstaged: old-checkpoint benchmark without saved results, not source of reported final-training metrics.",
-    "Pilot/trial/unexecuted local adapter development copies; no separate SOTA notebook located in supplied sources."
+    "Unused pilot and unexecuted development copies; adapter trial provenance now retained. No separate SOTA notebook in supplied sources."
   ],
   "checks": {
-    "notebook_count": 7,
+    "notebook_count": 10,
     "nbformat_and_IPython_syntax": "passed",
     "code_cell_order": "Original source order preserved; redundant full-experiment live probe and interrupted driver removed. No fresh GPU rerun.",
     "scientific_code": "All code unchanged except explicit opt-in wrapper for successful adapter full orchestration; artifact/provenance paths and hashes retained.",
@@ -87,5 +111,11 @@
     "week 45/Tuần 45 Adapter.docx": "9e817d8808a70a1ab8da0bedf7a71d158f72dad62d9760bb8d7ecbbebb010861",
     "week 45/45_7_523H0190_Baocaodoan.pdf": "8007dcf2fb34e8e0699eda96e4dfd44481b8526f481d6963c3a658e9f84013e5",
     "week 44/44_8_523H0190_Baocaodoan.pdf": "916b7677d47fdf26282263cb6bd0dbdf588c7c71137277a8538379304714cd31"
+  },
+  "handover_audit": {
+    "manifest": "VisFit_TaskB_TongKet/Mo_hinh/_Dung_chung/manifest.json",
+    "manifest_sha256": "2180bcd31c3711be6aa6e375fd3e167907d93533dadb4729e9f6df14da19bd4b",
+    "historical_internal_xaa_dvr": "ce9727984bc4352174854858148b50846319e246",
+    "verification_scope": "Compared ordered code cells against handover. Existing adapter full differs in live probe and guarded orchestration. No training or benchmark rerun."
   }
 }
